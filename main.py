@@ -7,6 +7,12 @@ from torchvision import models, transforms, datasets
 import torch.nn as nn
 import matplotlib.pyplot as plt
 
+from torch.utils.tensorboard import SummaryWriter
+
+
+writer = SummaryWriter(log_dir='runs')
+
+
 def imshow(inp, title=None):
     """ Imshow for Tensor"""
     print(inp.size())
@@ -46,17 +52,20 @@ data_transforms = {
     ])
 }
 
-train_dataset = datasets.ImageFolder(root="/home/jingwenlai/data/kaggle/Dogs_vs_Cats/train", transform=data_transforms['train'])
-train_dataloader = DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=1)
+train_dataset = datasets.ImageFolder(root="/home/jingwenlai/data/kaggle/dogs_and_cats/train", transform=data_transforms['train'])
+train_dataloader = DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=4)
+val_dataset = datasets.ImageFolder(root="/home/jingwenlai/data/kaggle/dogs_and_cats/dev", transform=data_transforms['val'])
+val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=4)
 
 class_names = ['cat', 'dog']
-
 device = torch.device('cuda:0' if torch.cuda.is_available() else "cpu")
-
 
 
 # Now, because the val set have problem, only use trainset
 def train_model(model, criterion, optimizer, lr_scheduler, num_epoches):
+    best_model = None
+    best_acc = 0.0
+
     for epoch in range(0, num_epoches):
         print("---------Training {}/{}---------".format(epoch, num_epoches))
         model.train()
@@ -87,12 +96,48 @@ def train_model(model, criterion, optimizer, lr_scheduler, num_epoches):
 
         lr_scheduler.step()
 
-        epoch_loss = running_loss/len(train_dataset)
-        epoch_acc = running_corrects.double()/len(train_dataset)
-        print('epoch loss:{:.4f}, epoch acc: {:.4f}'.format(epoch_loss, epoch_acc))
+        epoch_train_loss = running_loss/len(train_dataset)
+        epoch_train_acc = running_corrects.double()/len(train_dataset)
+        print('epoch train loss:{:.4f}, epoch train acc: {:.4f}'.format(epoch_train_loss, epoch_train_acc))
+        writer.add_scalar('epoch_train_loss',epoch_train_loss, epoch)
+        writer.add_scalar('epoch_train_acc', epoch_train_acc, epoch)
 
-    
+        model.eval()
+        val_loss = 0.0
+        val_corrects = 0
 
+        with torch.no_grad():
+            for inputs, labels in val_dataloader:
+                inputs = inputs.to(device)
+                labels = labels.to(device)
+
+                outputs = model(inputs)
+                _, preds = torch.max(outputs, 1)
+
+                loss = criterion(outputs, labels)
+
+                val_loss += loss.item() * inputs.size(0)
+                val_corrects += torch.sum(preds == labels.data)
+
+        epoch_val_loss = val_loss/len(val_dataset)
+        epoch_val_acc = val_corrects.double()/len(val_dataset)
+        print('epoch val loss: {:.4f}, epoch val acc: {:.4f}'.format(epoch_val_loss, epoch_val_acc))
+        writer.add_scalar('epoch_val_loss', epoch_val_loss, epoch)
+        writer.add_scalar('epoch_val_acc', epoch_val_acc, epoch)
+
+        if epoch_val_acc > best_acc:
+            best_acc = epoch_val_acc
+            ckpt_state = {
+                'epoch': epoch,
+                'best_acc' : best_acc,
+                'model_state': model.state_dict(),
+                'optimizer_state' : optimizer.state_dict(),
+                'loss': loss
+            }
+            torch.save(ckpt_state, 'ckpt_{}_model.pt'.format(epoch));
+            best_model = model.state_dict()
+        
+    return best_model
 
 
 model = models.resnet18(pretrained=True)
@@ -110,5 +155,4 @@ lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1
 
 best_model = train_model(model, criterion, optimizer, lr_scheduler, num_epoches=25)
 
-print("best_model:", best_model)
-
+torch.save(best_model, 'best_model.pt')
