@@ -99,8 +99,8 @@ def train_model(model, criterion, optimizer, lr_scheduler, num_epoches):
         epoch_train_loss = running_loss/len(train_dataset)
         epoch_train_acc = running_corrects.double()/len(train_dataset)
         print('epoch train loss:{:.4f}, epoch train acc: {:.4f}'.format(epoch_train_loss, epoch_train_acc))
-        writer.add_scalar('epoch_train_loss',epoch_train_loss, epoch)
-        writer.add_scalar('epoch_train_acc', epoch_train_acc, epoch)
+        #writer.add_scalar('epoch_train_loss',epoch_train_loss, epoch)
+        #writer.add_scalar('epoch_train_acc', epoch_train_acc, epoch)
 
         model.eval()
         val_loss = 0.0
@@ -122,8 +122,11 @@ def train_model(model, criterion, optimizer, lr_scheduler, num_epoches):
         epoch_val_loss = val_loss/len(val_dataset)
         epoch_val_acc = val_corrects.double()/len(val_dataset)
         print('epoch val loss: {:.4f}, epoch val acc: {:.4f}'.format(epoch_val_loss, epoch_val_acc))
-        writer.add_scalar('epoch_val_loss', epoch_val_loss, epoch)
-        writer.add_scalar('epoch_val_acc', epoch_val_acc, epoch)
+        #writer.add_scalar('epoch_val_loss', epoch_val_loss, epoch)
+        #writer.add_scalar('epoch_val_acc', epoch_val_acc, epoch)
+
+        writer.add_scalars('loss', {'train_loss': epoch_train_loss, 'val_loss': epoch_val_loss}, epoch)
+        writer.add_scalars('acc', {'train_acc': epoch_train_acc, 'val_acc': epoch_val_acc}, epoch)
 
         if epoch_val_acc > best_acc:
             best_acc = epoch_val_acc
@@ -150,8 +153,8 @@ model = model.to(device)
 print("modified model:", model)
 
 criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(model.fc.parameters(), lr=0.0001, momentum = 0.9)
-lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
+optimizer = torch.optim.SGD(model.fc.parameters(), lr=0.001, momentum = 0.9)
+lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
 
 best_model = train_model(model, criterion, optimizer, lr_scheduler, num_epoches=25)
 
