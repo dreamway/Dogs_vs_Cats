@@ -78,4 +78,4 @@ epoch train loss:0.1618, epoch train acc: 0.9345
 epoch val loss: 0.0745, epoch val acc: 0.9760
 
 ```
-3. TODO, predict test1.zip & generate the submission
+3. use *predict_and_save.py* to predict test1.zip & generate the submission
